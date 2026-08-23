@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Underground Ventilation Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #14171c;
+    --panel: #1b1f27;
+    --panel-2: #20252e;
+    --rock: #2a2f38;
+    --line: #333a45;
+    --amber: #e8a33d;
+    --amber-dim: #7a5a2c;
+    --teal: #52d6c4;
+    --red: #e2543f;
+    --text: #e8e6df;
+    --text-dim: #8b93a1;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:1280px;margin:0 auto;padding:28px 24px 60px;}
+  header{margin-bottom:20px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--amber); margin-bottom:6px;
+  }
+  h1{
+    font-family:'Rajdhani',sans-serif; font-weight:700; font-size:32px;
+    margin:0 0 6px; letter-spacing:.01em;
+  }
+  .sub{color:var(--text-dim); font-size:14px; max-width:640px; line-height:1.5;}
+
+  .grid{
+    display:grid; grid-template-columns: 1.5fr 1fr; gap:20px; margin-top:22px;
+  }
+  @media (max-width: 980px){ .grid{grid-template-columns:1fr;} }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:18px 20px;
+  }
+  .panel h2{
+    font-family:'Rajdhani',sans-serif; font-size:15px; text-transform:uppercase;
+    letter-spacing:.08em; color:var(--text-dim); margin:0 0 14px; font-weight:600;
+  }
+
+  svg{width:100%; height:auto; display:block;}
+  .node-label{font-family:'IBM Plex Mono',monospace; font-size:11px; fill:var(--text-dim);}
+  .equip-label{font-family:'Rajdhani',sans-serif; font-size:12px; fill:var(--text); font-weight:600;}
+
+  .ctrl-group{margin-bottom:18px;}
+  .ctrl-group:last-child{margin-bottom:0;}
+  .ctrl-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;}
+  .ctrl-name{font-size:13px; color:var(--text);}
+  .ctrl-val{font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--amber); min-width:52px; text-align:right;}
+  input[type=range]{
+    width:100%; -webkit-appearance:none; appearance:none; height:5px; border-radius:3px;
+    background:var(--rock); outline:none; margin-top:2px;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:16px; height:16px; border-radius:50%;
+    background:var(--amber); cursor:pointer; border:2px solid #191c22;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:16px; height:16px; border-radius:50%; background:var(--amber);
+    cursor:pointer; border:2px solid #191c22;
+  }
+  hr.div{border:none; border-top:1px solid var(--line); margin:16px 0;}
+
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th, td{
+    text-align:right; padding:6px 4px; font-family:'IBM Plex Mono',monospace;
+    border-bottom:1px solid var(--line);
+  }
+  th:first-child, td:first-child{text-align:left; font-family:'Inter',sans-serif; color:var(--text-dim);}
+  th{color:var(--text-dim); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.04em;}
+  td.dust-ok{color:var(--teal);}
+  td.dust-warn{color:var(--red); font-weight:600;}
+
+  .badge{
+    display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:11px;
+    padding:2px 8px; border-radius:20px; margin-left:6px;
+  }
+  .badge.ok{background:rgba(82,214,196,.14); color:var(--teal);}
+  .badge.warn{background:rgba(226,84,63,.16); color:var(--red);}
+
+  .suggestion{
+    border-radius:8px; padding:12px 14px; font-size:13px; line-height:1.5;
+    margin-top:10px; border:1px solid var(--line);
+  }
+  .suggestion.ok{background:rgba(82,214,196,.06); border-color:rgba(82,214,196,.25);}
+  .suggestion.warn{background:rgba(232,163,61,.07); border-color:rgba(232,163,61,.3);}
+  .suggestion.bad{background:rgba(226,84,63,.08); border-color:rgba(226,84,63,.3);}
+  .suggestion button{
+    margin-top:8px; background:var(--amber); color:#1a1305; border:none;
+    font-family:'Rajdhani',sans-serif; font-weight:700; font-size:12.5px;
+    padding:6px 14px; border-radius:6px; cursor:pointer; letter-spacing:.02em;
+  }
+  .suggestion button:hover{filter:brightness(1.08);}
+
+  .legend{display:flex; gap:16px; font-size:11.5px; color:var(--text-dim); margin-top:12px; flex-wrap:wrap;}
+  .legend span{display:inline-flex; align-items:center; gap:6px;}
+  .swatch{width:10px; height:10px; border-radius:50%; display:inline-block;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Ventsim &middot; Underground Ventilation Network</div>
+    <h1>Mine Ventilation &amp; Dust Simulator</h1>
+    <p class="sub">A two-district room-and-pillar layout. Adjust the main fan and district regulators to see how
+      airflow quantity redistributes through the network — and how that changes dust concentration at each face.</p>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Network Schematic</h2>
+      <svg id="schematic" viewBox="0 0 1000 660" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="legend">
+        <span><span class="swatch" style="background:#52d6c4"></span> clean air</span>
+        <span><span class="swatch" style="background:#e8a33d"></span> approaching limit</span>
+        <span><span class="swatch" style="background:#e2543f"></span> over dust limit</span>
+        <span>Particle speed &amp; density &#8776; airflow quantity</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Controls</h2>
+
+      <div class="ctrl-group">
+        <div class="ctrl-row"><span class="ctrl-name">Main fan speed</span><span class="ctrl-val" id="val-fan">100%</span></div>
+        <input type="range" id="fanSpeed" min="60" max="140" value="100" step="1">
+      </div>
+
+      <hr class="div">
+
+      <div class="ctrl-group">
+        <div class="ctrl-row"><span class="ctrl-name">Regulator &mdash; District A</span><span class="ctrl-val" id="val-regA">100%</span></div>
+        <input type="range" id="regA" min="5" max="100" value="100" step="1">
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-row"><span class="ctrl-name">Regulator &mdash; District B</span><span class="ctrl-val" id="val-regB">100%</span></div>
+        <input type="range" id="regB" min="5" max="100" value="100" step="1">
+      </div>
+
+      <hr class="div">
+
+      <div class="ctrl-group">
+        <div class="ctrl-row"><span class="ctrl-name">Dust generation &mdash; District A face</span><span class="ctrl-val" id="val-genA">45 mg/s</span></div>
+        <input type="range" id="genA" min="0" max="120" value="45" step="1">
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-row"><span class="ctrl-name">Dust generation &mdash; District B face</span><span class="ctrl-val" id="val-genB">32 mg/s</span></div>
+        <input type="range" id="genB" min="0" max="120" value="32" step="1">
+      </div>
+
+      <hr class="div">
+
+      <div class="ctrl-group">
+        <div class="ctrl-row"><span class="ctrl-name">Dust exposure limit</span><span class="ctrl-val" id="val-limit">2.0 mg/m&sup3;</span></div>
+        <input type="range" id="limit" min="0.5" max="6" value="2.0" step="0.1">
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:20px;">
+    <div class="panel">
+      <h2>Branch Readouts</h2>
+      <table>
+        <thead>
+          <tr><th>Airway</th><th>Q (m&sup3;/s)</th><th>Velocity (m/s)</th><th>Dust (mg/m&sup3;)</th></tr>
+        </thead>
+        <tbody id="branch-table"></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Regulator &amp; Fan Suggestions</h2>
+      <div id="suggestion-A" class="suggestion"></div>
+      <div id="suggestion-B" class="suggestion" style="margin-top:12px;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------------
+   Physics engine — mirrors ventsim/solver.py's closed-form solution for
+   this fixed two-district topology (verified against the general
+   Hardy-Cross solver in the Python package to 5+ significant figures).
+--------------------------------------------------------------------- */
+const BASE = {
+  R1: 0.015, R2: 0.02,           // downcast shaft, main intake roadway
+  R9: 0.025, R10: 0.018,         // main return roadway, upcast shaft
+  R3base: 0.06, R4base: 0.08,    // district intake airways (before regulator)
+  R5: 0.12, R6: 0.16,            // face airways
+  R7: 0.05, R8: 0.07,            // district returns
+  regRef: 0.02,                  // regulator reference resistance at 100% open
+  fanH0: 2800, fanK: 3.4,        // fan characteristic curve
+  areas: { b1:20,b2:16,b3:10,b4:10,b5:8,b6:8,b7:10,b8:10,b9:16,b10:20 },
+};
+
+function regulatorResistance(openingPct){
+  const o = Math.max(openingPct, 5);
+  return BASE.regRef * (100/o) ** 2;
+}
+
+function solveNetwork(state){
+  const { regA, regB, fanSpeed, genA, genB } = state;
+  const R3 = BASE.R3base + regulatorResistance(regA);
+  const R4 = BASE.R4base + regulatorResistance(regB);
+  const RA = R3 + BASE.R5 + BASE.R7;
+  const RB = R4 + BASE.R6 + BASE.R8;
+  const Rtrunk = BASE.R1 + BASE.R2 + BASE.R9 + BASE.R10;
+  const Rparallel = 1 / ((1/Math.sqrt(RA)) + (1/Math.sqrt(RB))) ** 2;
+  const Rtotal = Rtrunk + Rparallel;
+
+  const speed = fanSpeed / 100;
+  const Qtotal = Math.sqrt((speed*speed*BASE.fanH0) / (Rtotal + BASE.fanK));
+  const QA = Qtotal * Math.sqrt(RB) / (Math.sqrt(RA) + Math.sqrt(RB));
+  const QB = Qtotal * Math.sqrt(RA) / (Math.sqrt(RA) + Math.sqrt(RB));
+
+  const CA = genA / QA;
+  const CB = genB / QB;
+  const Cmix = (CA*QA + CB*QB) / Qtotal;
+
+  const q = { b1:Qtotal, b2:Qtotal, b3:QA, b4:QB, b5:QA, b6:QB, b7:QA, b8:QB, b9:Qtotal, b10:Qtotal };
+  const dust = { b1:0, b2:0, b3:0, b4:0, b5:CA, b6:CB, b7:CA, b8:CB, b9:Cmix, b10:Cmix };
+  const names = {
+    b1:'Downcast Shaft', b2:'Main Intake Roadway', b3:'District A Intake', b4:'District B Intake',
+    b5:'District A Face', b6:'District B Face', b7:'District A Return', b8:'District B Return',
+    b9:'Main Return Roadway', b10:'Upcast Shaft (Main Fan)'
+  };
+
+  const branches = {};
+  for (const id of Object.keys(names)){
+    branches[id] = { id, name: names[id], q: q[id], velocity: q[id]/BASE.areas[id], dust: dust[id] };
+  }
+  return { branches, Qtotal, QA, QB, CA, CB, Cmix, fanPressure: speed*speed*BASE.fanH0 - BASE.fanK*Qtotal*Qtotal };
+}
+
+/* Bisection-based suggestion engine, mirroring ventsim/optimizer.py */
+function suggestFix(state, target /* 'A' or 'B' */, limit, maxFanSpeed=140){
+  const key = target === 'A' ? 'genA' : 'genB';
+  const regKey = target === 'A' ? 'regA' : 'regB';
+  const dustKey = target === 'A' ? 'CA' : 'CB';
+  const current = solveNetwork(state)[dustKey];
+
+  if (current <= limit){
+    return { kind:'ok', text:`District ${target} face is within the limit (${current.toFixed(2)} mg/m³).` };
+  }
+
+  // Attempt 1: open this district's own regulator
+  if (state[regKey] < 100 - 1e-6){
+    const trialFull = {...state, [regKey]: 100};
+    if (solveNetwork(trialFull)[dustKey] <= limit){
+      let lo = state[regKey], hi = 100;
+      for (let i=0;i<30;i++){
+        const mid = (lo+hi)/2;
+        const trial = {...state, [regKey]: mid};
+        if (solveNetwork(trial)[dustKey] <= limit) hi = mid; else lo = mid;
+      }
+      return {
+        kind:'regulator', target: hi,
+        text:`Open the District ${target} regulator from ${state[regKey].toFixed(0)}% to about `+
+             `${hi.toFixed(0)}% to bring the face back under ${limit.toFixed(1)} mg/m³.`
+      };
+    }
+  }
+
+  // Attempt 2: raise main fan speed (with regulators fully open)
+  const trialFan = {...state, regA:100, regB:100, fanSpeed:maxFanSpeed};
+  if (solveNetwork(trialFan)[dustKey] <= limit){
+    let lo = state.fanSpeed, hi = maxFanSpeed;
+    for (let i=0;i<30;i++){
+      const mid=(lo+hi)/2;
+      const trial = {...state, regA:100, regB:100, fanSpeed:mid};
+      if (solveNetwork(trial)[dustKey] <= limit) hi = mid; else lo = mid;
+    }
+    const pct = ((hi/state.fanSpeed)-1)*100;
+    return {
+      kind:'fan', target: hi,
+      text:`Fully open both district regulators and raise the main fan speed from `+
+           `${state.fanSpeed.toFixed(0)}% to about ${hi.toFixed(0)}% (${pct>=0?'+':''}${pct.toFixed(0)}%) `+
+           `to bring District ${target} under ${limit.toFixed(1)} mg/m³.`
+    };
+  }
+
+  return {
+    kind:'infeasible',
+    text:`District ${target} cannot be brought under ${limit.toFixed(1)} mg/m³ with the main fan and `+
+         `regulators alone — consider an auxiliary/booster fan in that district, or additional dust `+
+         `suppression (water sprays, scrubber) at the source.`
+  };
+}
+
+/* ---------------------------------------------------------------------
+   UI wiring
+--------------------------------------------------------------------- */
+const els = {
+  fanSpeed: document.getElementById('fanSpeed'),
+  regA: document.getElementById('regA'),
+  regB: document.getElementById('regB'),
+  genA: document.getElementById('genA'),
+  genB: document.getElementById('genB'),
+  limit: document.getElementById('limit'),
+};
+const valEls = {
+  fanSpeed: document.getElementById('val-fan'),
+  regA: document.getElementById('val-regA'),
+  regB: document.getElementById('val-regB'),
+  genA: document.getElementById('val-genA'),
+  genB: document.getElementById('val-genB'),
+  limit: document.getElementById('val-limit'),
+};
+
+function getState(){
+  return {
+    fanSpeed: parseFloat(els.fanSpeed.value),
+    regA: parseFloat(els.regA.value),
+    regB: parseFloat(els.regB.value),
+    genA: parseFloat(els.genA.value),
+    genB: parseFloat(els.genB.value),
+  };
+}
+function getLimit(){ return parseFloat(els.limit.value); }
+
+function dustColor(conc, limit){
+  const ratio = conc / limit;
+  if (ratio <= 0.6) return '#52d6c4';
+  if (ratio <= 1.0){
+    const t = (ratio-0.6)/0.4;
+    return lerpColor('#52d6c4','#e8a33d', t);
+  }
+  const t = Math.min((ratio-1.0)/0.8, 1);
+  return lerpColor('#e8a33d','#e2543f', t);
+}
+function lerpColor(a,b,t){
+  const pa = hexToRgb(a), pb = hexToRgb(b);
+  const r = Math.round(pa[0]+(pb[0]-pa[0])*t);
+  const g = Math.round(pa[1]+(pb[1]-pa[1])*t);
+  const bl = Math.round(pa[2]+(pb[2]-pa[2])*t);
+  return `rgb(${r},${g},${bl})`;
+}
+function hexToRgb(h){ h=h.replace('#',''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
+
+/* ---- SVG schematic ---- */
+const svg = document.getElementById('schematic');
+const NS = 'http://www.w3.org/2000/svg';
+
+// path definitions: id -> {d, labelPos, labelText, kind}
+const PATHS = {
+  b1:  { d:'M 200,30 L 200,150',              label:'Downcast Shaft', lx:210, ly:90 },
+  b2:  { d:'M 200,150 L 500,150',             label:'Main Intake',     lx:320, ly:138 },
+  b3:  { d:'M 500,150 L 700,270',             label:'Intake A',        lx:635, ly:195, regulator:{x:600,y:210} },
+  b4:  { d:'M 500,150 L 300,270',             label:'Intake B',        lx:365, ly:195, regulator:{x:400,y:210} },
+  b5:  { d:'M 700,270 L 700,350',             label:'Face A',          lx:712, ly:310, dust:{x:700,y:350,rate:'genA'} },
+  b6:  { d:'M 300,270 L 300,350',             label:'Face B',          lx:212, ly:310, dust:{x:300,y:350,rate:'genB'} },
+  b7:  { d:'M 700,350 L 500,470',             label:'Return A',        lx:635, ly:425 },
+  b8:  { d:'M 300,350 L 500,470',             label:'Return B',        lx:365, ly:425 },
+  b9:  { d:'M 500,470 L 800,470',             label:'Main Return',     lx:640, ly:458 },
+  b10: { d:'M 800,470 L 800,30',              label:'Upcast Shaft',    lx:810, ly:250, fan:{x:800,y:110} },
+};
+
+function buildSchematic(){
+  svg.innerHTML = '';
+  // ground line
+  const ground = document.createElementNS(NS,'line');
+  ground.setAttribute('x1',60); ground.setAttribute('y1',30);
+  ground.setAttribute('x2',940); ground.setAttribute('y2',30);
+  ground.setAttribute('stroke','#3a4150'); ground.setAttribute('stroke-width',2);
+  ground.setAttribute('stroke-dasharray','2 6');
+  svg.appendChild(ground);
+  const groundLabel = textEl(60,20,'SURFACE','node-label');
+  svg.appendChild(groundLabel);
+
+  for (const [id, p] of Object.entries(PATHS)){
+    // wide rock-tunnel backdrop
+    const backdrop = document.createElementNS(NS,'path');
+    backdrop.setAttribute('d', p.d);
+    backdrop.setAttribute('stroke', '#2a2f38');
+    backdrop.setAttribute('stroke-width', 16);
+    backdrop.setAttribute('fill','none');
+    backdrop.setAttribute('stroke-linecap','round');
+    svg.appendChild(backdrop);
+
+    // animated flow path
+    const flow = document.createElementNS(NS,'path');
+    flow.setAttribute('d', p.d);
+    flow.setAttribute('id', 'flow-'+id);
+    flow.setAttribute('fill','none');
+    flow.setAttribute('stroke-linecap','round');
+    flow.setAttribute('stroke-dasharray','2 14');
+    svg.appendChild(flow);
+
+    // label
+    const label = textEl(p.lx, p.ly, p.label, 'equip-label');
+    svg.appendChild(label);
+
+    if (p.regulator){
+      const g = document.createElementNS(NS,'g');
+      g.setAttribute('id', 'reg-'+id);
+      const rect = document.createElementNS(NS,'rect');
+      rect.setAttribute('x', p.regulator.x-10); rect.setAttribute('y', p.regulator.y-6);
+      rect.setAttribute('width',20); rect.setAttribute('height',12);
+      rect.setAttribute('rx',2);
+      rect.setAttribute('fill', '#e8a33d'); rect.setAttribute('stroke','#191c22');
+      g.appendChild(rect);
+      svg.appendChild(g);
+    }
+    if (p.fan){
+      const g = document.createElementNS(NS,'g');
+      g.setAttribute('id','fan-icon');
+      g.setAttribute('transform', `translate(${p.fan.x},${p.fan.y})`);
+      const circle = document.createElementNS(NS,'circle');
+      circle.setAttribute('r',22); circle.setAttribute('fill','#20252e');
+      circle.setAttribute('stroke','#e8a33d'); circle.setAttribute('stroke-width',2);
+      g.appendChild(circle);
+      const blades = document.createElementNS(NS,'g');
+      blades.setAttribute('id','fan-blades');
+      for (let i=0;i<3;i++){
+        const blade = document.createElementNS(NS,'ellipse');
+        blade.setAttribute('cx',0); blade.setAttribute('cy',-11);
+        blade.setAttribute('rx',5); blade.setAttribute('ry',12);
+        blade.setAttribute('fill','#e8a33d');
+        blade.setAttribute('transform',`rotate(${i*120})`);
+        blades.appendChild(blade);
+      }
+      g.appendChild(blades);
+      svg.appendChild(g);
+      const flabel = textEl(p.fan.x, p.fan.y+40, 'MAIN FAN', 'node-label');
+      flabel.setAttribute('text-anchor','middle');
+      svg.appendChild(flabel);
+    }
+    if (p.dust){
+      const g = document.createElementNS(NS,'g');
+      g.setAttribute('id','dust-'+id);
+      g.setAttribute('transform', `translate(${p.dust.x},${p.dust.y})`);
+      for (let i=0;i<5;i++){
+        const dot = document.createElementNS(NS,'circle');
+        dot.setAttribute('cx', (Math.random()-0.5)*24);
+        dot.setAttribute('cy', (Math.random())*14+4);
+        dot.setAttribute('r', 2.2);
+        dot.setAttribute('class','dust-dot');
+        g.appendChild(dot);
+      }
+      svg.appendChild(g);
+    }
+  }
+
+  // junction nodes
+  for (const [x,y] of [[200,150],[500,150],[700,270],[300,270],[700,350],[300,350],[500,470],[800,470]]){
+    const c = document.createElementNS(NS,'circle');
+    c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r',4);
+    c.setAttribute('fill','#8b93a1');
+    svg.appendChild(c);
+  }
+}
+function textEl(x,y,text,cls){
+  const t = document.createElementNS(NS,'text');
+  t.setAttribute('x',x); t.setAttribute('y',y);
+  t.setAttribute('class',cls);
+  t.textContent = text;
+  return t;
+}
+
+let dashOffset = 0;
+function animate(){
+  dashOffset -= 0.6;
+  const state = getState();
+  const limit = getLimit();
+  const result = solveNetwork(state);
+  for (const [id, p] of Object.entries(PATHS)){
+    const flow = document.getElementById('flow-'+id);
+    if (!flow) continue;
+    const br = result.branches[id];
+    const color = dustColor(br.dust, limit);
+    flow.setAttribute('stroke', color);
+    const speedFactor = Math.max(0.4, Math.min(3, br.velocity));
+    flow.setAttribute('stroke-width', Math.max(2, Math.min(7, Math.abs(br.velocity)*3)));
+    flow.style.strokeDashoffset = (dashOffset * speedFactor).toString();
+  }
+  const blades = document.getElementById('fan-blades');
+  if (blades){
+    const rot = (dashOffset * (state.fanSpeed/100) * 4) % 360;
+    blades.setAttribute('transform', `rotate(${rot})`);
+  }
+  document.querySelectorAll('.dust-dot').forEach((dot,i) => {
+    const parentId = dot.parentNode.id;
+    const branchId = parentId.replace('dust-','');
+    const br = result.branches[branchId];
+    const ratio = br ? Math.min(br.dust/limit, 2) : 0;
+    dot.setAttribute('opacity', 0.25 + Math.min(ratio,1)*0.6);
+    dot.setAttribute('fill', dustColor(br ? br.dust : 0, limit));
+  });
+  requestAnimationFrame(animate);
+}
+
+function updateReadoutTable(){
+  const state = getState();
+  const limit = getLimit();
+  const result = solveNetwork(state);
+  const tbody = document.getElementById('branch-table');
+  tbody.innerHTML = '';
+  for (const br of Object.values(result.branches)){
+    const over = br.dust > limit;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${br.name}</td><td>${br.q.toFixed(2)}</td><td>${br.velocity.toFixed(2)}</td>`+
+                   `<td class="${over?'dust-warn':'dust-ok'}">${br.dust.toFixed(2)}${over?' <span class="badge warn">OVER</span>':''}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function updateSuggestions(){
+  const state = getState();
+  const limit = getLimit();
+  for (const target of ['A','B']){
+    const s = suggestFix(state, target, limit);
+    const box = document.getElementById('suggestion-'+target);
+    box.className = 'suggestion ' + (s.kind==='ok' ? 'ok' : s.kind==='infeasible' ? 'bad' : 'warn');
+    let html = `<strong>District ${target}</strong> — ${s.text}`;
+    if (s.kind === 'regulator'){
+      html += `<br><button data-action="reg${target}" data-value="${s.target}">Apply: open regulator to ${s.target.toFixed(0)}%</button>`;
+    } else if (s.kind === 'fan'){
+      html += `<br><button data-action="fan" data-value="${s.target}">Apply: fan to ${s.target.toFixed(0)}%, regulators open</button>`;
+    }
+    box.innerHTML = html;
+  }
+  document.querySelectorAll('.suggestion button').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const action = e.target.getAttribute('data-action');
+      const value = parseFloat(e.target.getAttribute('data-value'));
+      if (action === 'regA'){ els.regA.value = value; valEls.regA.textContent = value.toFixed(0)+'%'; }
+      if (action === 'regB'){ els.regB.value = value; valEls.regB.textContent = value.toFixed(0)+'%'; }
+      if (action === 'fan'){
+        els.regA.value = 100; valEls.regA.textContent = '100%';
+        els.regB.value = 100; valEls.regB.textContent = '100%';
+        els.fanSpeed.value = value; valEls.fanSpeed.textContent = value.toFixed(0)+'%';
+      }
+      refreshAll();
+    });
+  });
+}
+
+function refreshAll(){
+  valEls.fanSpeed.textContent = els.fanSpeed.value + '%';
+  valEls.regA.textContent = els.regA.value + '%';
+  valEls.regB.textContent = els.regB.value + '%';
+  valEls.genA.textContent = els.genA.value + ' mg/s';
+  valEls.genB.textContent = els.genB.value + ' mg/s';
+  valEls.limit.textContent = parseFloat(els.limit.value).toFixed(1) + ' mg/m\u00B3';
+  updateReadoutTable();
+  updateSuggestions();
+}
+
+Object.values(els).forEach(el => el.addEventListener('input', refreshAll));
+
+buildSchematic();
+refreshAll();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+# --- Secrets: never commit these ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*credentials*.json
+secrets.*
+**/config/secrets.yml
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg
+
+# --- Node (in case a future web build step is added) ---
+node_modules/
+npm-debug.log*
+dist/
+build/
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Generated output from CLI sweeps/plots ---
+*.png
+!web/**/*.png
